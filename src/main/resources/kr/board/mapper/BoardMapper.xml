@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="kr.board.mapper.tblBoardMapper">
+
+	<select id="getList" resultType="kr.board.entity.tblBoard">
+		select * 
+		from 
+			tblBoard 
+		order by
+			 boardGroup desc
+	</select>
+	
+	<insert id="insert" parameterType="kr.board.entity.tblBoard">
+		insert into
+		tblBoard(idx,memID,title,content,writer,boardGroup,boardSequence,boardLevel,boardAvailable)
+				select	NVL(max(idx)+1, 1),#{memID},#{title},#{content},#{writer},
+						NVL(max(boardGroup)+1, 0),0,0,1
+				from tblBoard
+	</insert>
+	
+	<insert id="insertSelectKey" parameterType="kr.board.entity.tblBoard">
+		<selectKey keyProperty="idx,boardGroup" resultType="kr.board.entity.tblBoard" order="BEFORE">
+			select NVL(max(idx)+1, 1) as idx,
+				   NVL(max(boardGroup)+1, 0) as boardGroup
+			from tblBoard
+		</selectKey>
+		INSERT INTO 
+		tblBoard(idx,memID,title,content,writer,boardGroup,boardSequence,boardLevel,boardAvailable)
+	    values(#{idx},#{memID},#{title},#{content},#{writer},#{boardGroup},0,0,1) 
+		
+	</insert>
+	
+
+	
+</mapper>

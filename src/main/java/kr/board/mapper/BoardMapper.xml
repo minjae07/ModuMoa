@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="kr.board.mapper.BoardMapper">
+
+	<select id="getLists" resultType="kr.board.entity.Board">
+		SELECT
+			 IDX
+			,MEMID
+			,TITLE
+			,CONTENT
+			,WRITER
+			,INDATE
+			,COUNT
+		FROM BOARD
+		ORDER BY IDX DESC
+	</select>
+
+	<insert id="boardInsert" parameterType="kr.board.entity.Board">
+		INSERT INTO BOARD (IDX,
+		memID, TITLE, CONTENT, WRITER)
+		VALUES(BOARD_IDX.NEXTVAL, #{memID}, #{title}, #{content}, #{writer})
+
+	</insert>
+
+	<select id="boardContent" resultType="kr.board.entity.Board">
+		SELECT * FROM BOARD WHERE IDX=#{idx}
+	</select>
+
+	<delete id="boardDelete" parameterType="int">
+		DELETE FROM BOARD WHERE IDX=#{idx}
+	</delete>
+
+ 	<update id="boardUpdate" parameterType="kr.board.entity.Board">
+		UPDATE BOARD 
+		SET 
+			 TITLE=#{title}
+			,CONTENT=#{content}
+		WHERE 
+			 IDX=#{idx}
+	</update> 
+	
+	<select id="getbestList" resultType="kr.board.entity.TblBoard">
+	select *
+		from (
+			select *
+			from tblBoard
+			WHERE boardType IN ('free', 'reply')
+			order by count desc
+		)
+	where rownum <![CDATA[ <= ]]> 5
+	</select>
+	
+	<select id="getbestnotice" resultType="kr.board.entity.TblBoard">
+	select *
+		from (
+			select *
+			from tblBoard
+			WHERE boardType = 'notice'
+			order by count desc
+		)
+	where rownum <![CDATA[ <= ]]> 5
+	</select>
+	
+	<select id="getListCount" resultType="kr.board.entity.Board">
+		SELECT 
+				memID, COUNT(memID) FROM board
+		GROUP BY memID
+		HAVING COUNT(memID) <![CDATA[ >= ]]> 0
+	</select>
+		
+		
+    <sql id="search">
+    	<if test="searchType != null">
+			<if test="searchType == 'title'">
+					AND title LIKE '%'|| #{keyWord} || '%'
+			</if>
+			<if test="searchType == 'writer'">
+					AND writer LIKE '%'|| #{keyWord} || '%'
+			</if>
+			<if test="searchType == 'content'">
+					AND content LIKE '%'|| #{keyWord} || '%'
+			</if>
+		</if>
+    </sql>
+	
+	<select id="getList" parameterType="kr.board.entity.Criteria" resultType="kr.board.entity.TblBoard">
+	    SELECT *
+	    FROM (
+	        SELECT ROWNUM AS RNUM, A.*
+	        FROM (
+	            SELECT *
+	            FROM TBLBOARD
+	            WHERE boardType IN ('free', 'reply')
+	             <include refid="search"/>
+	            ORDER BY boardGroup DESC, boardSequence ASC
+	        ) A
+	        WHERE ROWNUM &lt;= #{page} * #{perPageNum}
+	    ) 
+	    WHERE RNUM &gt; ((#{page}-1) * #{perPageNum})
+	</select>
+	
+	<select id="getNotice" resultType="kr.board.entity.TblBoard">
+	select *
+		from (
+			select *
+			from tblBoard
+			WHERE boardType = 'notice'
+			order by indate desc
+		)
+	where rownum <![CDATA[ <= ]]> 3
+	</select>
+	
+	
+	<insert id="insertSelectKey" parameterType="kr.board.entity.TblBoard">
+		<selectKey keyProperty="idx,boardGroup" resultType="kr.board.entity.TblBoard" order="BEFORE">
+			select NVL(max(idx)+1, 1) as idx,
+				   NVL(max(boardGroup)+1, 0) as boardGroup
+			from tblBoard
+		</selectKey>
+		INSERT INTO 
+		tblBoard(idx,memID,title,content,writer,boardGroup,boardSequence,boardLevel,boardAvailable, boardType)
+	    values(#{idx},#{memID},#{title},#{content},#{writer},#{boardGroup},0,0,1,#{boardType}) 
+		
+	</insert>
+	
+	<select id="read" resultType="kr.board.entity.TblBoard" parameterType="int">
+		SELECT idx
+			 , memID
+			 , title
+			 , content
+			 , writer
+			 , indate
+			 , count
+			 , boardGroup
+			 , boardSequence
+			 , boardLevel
+			 , boardAvailable
+			 , boardType
+		  FROM TBLBOARD
+		 WHERE IDX = #{idx}
+	</select>
+	
+	<update id="count" parameterType="int">
+	UPDATE TBLBOARD
+	SET COUNT= NVL(COUNT,0) + 1
+	WHERE IDX=#{idx}
+	</update>
+
+	<update id="update" parameterType="kr.board.entity.TblBoard">
+    UPDATE TBLBOARD 
+    SET TITLE = #{title}, CONTENT=#{content}
+    WHERE IDX=#{idx}
+	</update>
+	
+	
+	<select id="hasReplies" resultType="int">
+		SELECT COUNT(*) FROM TBLBOARD WHERE BOARDGROUP = #{boardGroup}
+	</select>
+	
+	<update id="temp">
+		UPDATE TBLBOARD SET BOARDAVAILABLE=0 WHERE IDX=#{idx}
+	</update>
+	
+	<update id="delTemp">
+		UPDATE TBLBOARD SET BOARDAVAILABLE=1 WHERE IDX=#{idx}
+	</update>
+	
+	<delete id="delete">
+		delete
+		from TBLBOARD
+		where IDX=#{idx}
+	</delete>
+	
+	<delete id="deleteReply">
+		DELETE FROM TBLREPLY WHERE IDX = #{idx}
+	</delete>
+	
+	<update id="replySeqUpdate" parameterType="kr.board.entity.TblBoard">
+		UPDATE TBLBOARD 
+		SET boardSequence = boardSequence+1
+		WHERE boardGroup=#{boardGroup} and boardSequence > #{boardSequence}
+	</update>
+	
+ 	<!-- <insert id="replyInsert" parameterType="kr.board.entity.TblBoard">
+		insert into
+		tblBoard(TBLBOARD_seq.nextval,memID,title,content,writer,boardGroup,boardSequence,boardLevel,boardAvailable)
+				select	NVL(max(idx)+1, 1),#{memID},#{title},#{content},#{writer},
+						NVL(max(boardGroup)+1, 0),#{boardSequence},#{boardLevel},1
+				from tblBoard
+	</insert>  -->
+	
+  <insert id="replyInsert" parameterType="kr.board.entity.TblBoard">
+    <selectKey keyProperty="idx" resultType="kr.board.entity.TblBoard" order="BEFORE">
+        select NVL(max(idx)+1, 1) as idx from tblBoard
+    </selectKey>
+    INSERT INTO 
+        tblBoard(idx, memID, title, content, writer, boardGroup, boardSequence, boardLevel, boardAvailable, boardType)
+    values(#{idx}, #{memID}, #{title}, #{content}, #{writer}, #{boardGroup}, #{boardSequence}, #{boardLevel}, 1, #{boardType}) 
+</insert>
+
+<select id="totalCount" resultType="int" parameterType="kr.board.entity.Criteria">
+	select count(*) 
+	from tblBoard
+	where boardType IN ('free', 'reply')
+	<include refid="search"/>
+</select>
+
+<select id="getviewList" parameterType="kr.board.entity.Criteria" resultType="kr.board.entity.TblBoard">
+ SELECT *
+	    FROM (
+	        SELECT ROWNUM AS RNUM, A.*
+	        FROM (
+	            SELECT *
+	            FROM TBLBOARD
+	            WHERE boardType = 'free'
+	            ORDER BY boardGroup DESC, boardSequence ASC
+	        ) A
+	        WHERE ROWNUM &lt;= #{page} * #{perPageNum}
+	    ) 
+	    WHERE RNUM &gt; ((#{page}-1) * #{perPageNum})
+</select>
+</mapper>
